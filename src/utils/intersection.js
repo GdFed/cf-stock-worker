@@ -33,11 +33,10 @@ export function intersectionByDateSet(buyText, strongText, targetDates) {
  * Convenience wrapper using two dates.
  * @param {string} buyText
  * @param {string} strongText
- * @param {string} today
- * @param {string} yesterday
+ * @param {string[]} days
  * @returns {string[]}
  */
-export function intersectionByDates(buyText, strongText, today, yesterday) {
-  const targetDates = new Set([today, yesterday]);
+export function intersectionByDates(buyText, strongText, days) {
+  const targetDates = new Set(days);
   return intersectionByDateSet(buyText, strongText, targetDates);
 }

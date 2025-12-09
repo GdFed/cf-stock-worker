@@ -12,9 +12,9 @@ const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 
 /* ============  2. 取最近两个交易日  ============ */
-const todayTrade   = fmt(lastTradeDay(new Date(), 0));
-const yesterdayTrade = fmt(lastTradeDay(new Date(todayTrade), -1));
-console.log(`[INFO] 过滤日期：${todayTrade} / ${yesterdayTrade}`);
+const td   = fmt(lastTradeDay(new Date(), 0));
+const yd = fmt(lastTradeDay(new Date(td), -1));
+console.log(`[INFO] 过滤日期：${td} / ${yd}`);
 
 
 /* ============  5. 写入/更新 Notion  ============ */
@@ -25,13 +25,13 @@ async function upsert(code) {
     filter: {
       and: [
         { property: 'Code', title: { equals: code } },
-        { property: 'Date', date: { equals: todayTrade } }
+        { property: 'Date', date: { equals: td } }
       ]
     }
   });
   const payload = {
     Code: { title: [{ text: { content: code } }] },
-    Date: { date: { start: todayTrade } },
+    Date: { date: { start: td } },
     来源: { select: { name: '交集' } }
   };
   if (exist.results.length) {
@@ -45,11 +45,14 @@ async function upsert(code) {
 
 (async ()=>{
   // 3. 从 GitHub 原始文件读取（可换私有仓库+token）
-  const buyText = await getGitHubFile('https://raw.githubusercontent.com/GdFed/cf-stock-worker/main/data/buy.txt');
-  const strongText = await getGitHubFile('https://raw.githubusercontent.com/GdFed/cf-stock-worker/main/data/strong.txt');
+    const buyRes = await fetch("http://xgpiao.net/mystock/const/hisdata/sortdata/genes_buy.txt");
+    const buyText = await buyRes.text();
+    // const strongText= await getGitHubFile('https://raw.githubusercontent.com/GdFed/cf-stock-worker/main/data/strong.txt');
+    const strongRes = await fetch(`http://xgpiao.net/mystock/const/hisdata/sortdata/ghosthisdata/power_${yd}.txt`);
+    const strongText = await strongRes.text();
 
   // 4. 计算交集
-  const codes = intersectionByDates(buyText, strongText, todayTrade, yesterdayTrade);
+  const codes = intersectionByDates(buyText, strongText, [td, yd]);
 
   if(!codes.length) {
     console.log('[INFO] 无交集，跳过');
