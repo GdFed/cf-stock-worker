@@ -1,6 +1,5 @@
 import { intersectionByDates } from './utils/intersection.js';
 import { fmt, lastTradeDay } from './utils/trading-day.js';
-// import { getGitHubFile } from './utils/github-file.js';
 
 // 买点 ∩ 强资金 交集逻辑（已去重、排序）
 export default {
@@ -16,11 +15,10 @@ export default {
       yd = fmt(lastTradeDay(d,-1));
     }
 
-    // 2. 从 GitHub 原始文件读取（可换私有仓库+token
+    // 2. 读取数据
     const buyRes = await fetch("http://xgpiao.net/mystock/const/hisdata/sortdata/genes_buy.txt");
     const buyText = await buyRes.text();
-    // const strongText= await getGitHubFile('https://raw.githubusercontent.com/GdFed/cf-stock-worker/main/data/strong.txt');
-    const strongRes = await fetch(`http://xgpiao.net/mystock/const/hisdata/sortdata/ghosthisdata/power_${yd}.txt`);
+    const strongRes = await fetch(`http://xgpiao.net/mystock/const/hisdata/sortdata/ghosthisdata/power_${yd}.txt`).catch(()=> []);
     const strongText = await strongRes.text();
 
     // 3. 计算
