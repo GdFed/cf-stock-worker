@@ -1,0 +1,19 @@
+{
+  "name": "cf-stock-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Sync intersection of buy/strong picks to Notion database",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "sync2notion": "node src/sync2notion.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.5"
+  }
+}

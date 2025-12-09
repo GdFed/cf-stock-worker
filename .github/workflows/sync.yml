@@ -1,17 +1,19 @@
-name: SyncToNotion
+name: Sync to Notion
 on:
+  workflow_dispatch:
   schedule:
-    - cron: '0 7 * * 1-5'   # 工作日 07:00 UTC
-  workflow_dispatch:        # 手动触发
+    - cron: '30 6 * * *'  # 每天 06:30 UTC
 jobs:
-  build:
+  sync:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 20 }
+        with:
+          node-version: '18'
+          cache: 'npm'
       - run: npm ci
-      - run: node src/sync2notion.js
+      - run: npm run sync2notion
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
