@@ -100,21 +100,35 @@ async function fetchFromSinaOpenapi(symbol, datalen) {
 }
 
 async function fetchPrices(symbol, datalen) {
-  const providers = [
-    () => fetchFromEastmoney(symbol, datalen),
-    () => fetchFromSinaOpenapi(symbol, datalen)
-  ];
-  for (const p of providers) {
-    try {
-      const arr = await p();
+  const tasks = [
+    fetchFromEastmoney(symbol, datalen).then(arr => {
       if (Array.isArray(arr) && arr.length >= 2) return arr;
-    } catch (e) {
-      console.warn(`[WARN] 数据源失败 ${symbol}: ${e.message}`);
+      throw new Error('eastmoney empty');
+    }),
+    fetchFromSinaOpenapi(symbol, datalen).then(arr => {
+      if (Array.isArray(arr) && arr.length >= 2) return arr;
+      throw new Error('sina openapi empty');
+    })
+  ];
+
+  return new Promise((resolve) => {
+    let pending = tasks.length;
+    let settled = false;
+    for (const p of tasks) {
+      p.then(result => {
+        if (!settled) {
+          settled = true;
+          resolve(result);
+        }
+      }).catch(e => {
+        console.warn(`[WARN] 数据源失败 ${symbol}: ${e.message}`);
+        pending -= 1;
+        if (pending === 0 && !settled) {
+          resolve(null);
+        }
+      });
     }
-    // 随机短暂等待，避免瞬时触发风控
-    await new Promise(r => setTimeout(r, 300 + Math.random() * 400));
-  }
-  return null;
+  });
 }
 
 /**
