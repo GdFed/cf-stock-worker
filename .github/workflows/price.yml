@@ -1,8 +1,8 @@
-name: Sync to Notion
+name: Stock to Price
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '30 23 * * *'  # 每天 15:30 UTC
+  # schedule:
+    # - cron: '30 23 * * *'  # 每天 15:30 UTC
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -13,7 +13,7 @@ jobs:
           node-version: '18'
           cache: 'npm'
       - run: npm ci
-      - run: npm run s2n
+      - run: npm run s2p
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}

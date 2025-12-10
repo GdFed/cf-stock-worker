@@ -6,7 +6,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "sync2notion": "node src/sync2notion.js"
+    "s2n": "node src/sync2notion.js",
+    "s2p": "node src/stock2price.js"
   },
   "engines": {
     "node": ">=18.0.0"
