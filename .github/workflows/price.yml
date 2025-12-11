@@ -1,8 +1,8 @@
 name: Stock to Price
 on:
   workflow_dispatch:
-  # schedule:
-    # - cron: '30 23 * * *'  # 每天 15:30 UTC
+  schedule:
+    - cron: '20 9 * * *'  # 每天 17:30 UTC
 jobs:
   sync:
     runs-on: ubuntu-latest

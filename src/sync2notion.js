@@ -148,7 +148,7 @@ async function listExistingByDate(dateStr) {
         database_id: DATABASE_ID,
         filter: { property: 'Date', date: { equals: dateStr } },
         start_cursor: cursor,
-        page_size: 100
+        page_size: 300
       }),
       { retries: 3, minDelayMs: 1000, factor: 2 }
     );

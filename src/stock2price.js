@@ -2,6 +2,8 @@
 import dotenv from 'dotenv';
 import { Client } from '@notionhq/client';
 import dayjs from 'dayjs';
+import { fetchFromEastmoney } from './fetchers/eastmoney.js';
+import { fetchFromSinaOpenapi } from './fetchers/sina-openapi.js';
 
 dotenv.config();
 
@@ -20,127 +22,28 @@ const USE_NOTION = argUseNotion
 const notion = USE_NOTION ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
-const DEFAULT_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
-const textLooksBlocked = (txt) => /拒绝访问|Access Denied/i.test(txt);
 
-const safeJSON = (txt) => {
-  try { return JSON.parse(txt); } catch { return null; }
-};
-
-/**
- * 将 6 位股票代码转换为新浪接口 symbol
- * 规则：0/3 → sz，6 → sh，其他 → bj
- * 传入值形态为 "002095"
- */
-function normalizeSymbol(code) {
-  const c = String(code).trim();
-  if (!/^\d{6}$/.test(c)) {
-    console.warn(`[WARN] 非 6 位数字代码，默认 bj 前缀：${code}`);
-    return `bj${c}`;
-  }
-  const first = c[0];
-  if (first === '0' || first === '3') return `sz${c}`;
-  if (first === '6') return `sh${c}`;
-  return `bj${c}`;
-}
-
-/**
- * 拉取 K 线数据（多源：优先东方财富，失败回退新浪 openapi）
- * 返回：解析后的数组（元素包含 day/close/...），或 null
- */
-async function fetchFromEastmoney(symbol, datalen) {
-  const code = symbol.slice(2);
-  const ex = symbol.slice(0, 2); // sh/sz/bj
-  const secid = (ex === 'sh' ? `1.${code}` : `0.${code}`); // bj 暂按 0
-  const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&klt=101&fqt=1&end=20500101&lmt=${datalen}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56`;
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': DEFAULT_UA,
-      'Referer': 'https://quote.eastmoney.com',
-      'Accept': 'application/json, text/plain, */*'
-    }
-  });
-  if (!res.ok) throw new Error(`eastmoney ${res.status}`);
-  const txt = await res.text();
-  if (textLooksBlocked(txt)) throw new Error('eastmoney blocked');
-  const j = safeJSON(txt);
-  const arr = j?.data?.klines;
-  if (!Array.isArray(arr) || arr.length < 2) return null;
-  return arr.map(line => {
-    const parts = String(line).split(',');
-    return {
-      day: parts[0],
-      open: parts[1],
-      close: parts[2],
-      high: parts[3],
-      low: parts[4]
-    };
-  });
-}
-
-async function fetchFromSinaOpenapi(symbol, datalen) {
-  const url = `https://quotes.sina.cn/cn/api/openapi.php/CN_MarketDataService.getKLineData?symbol=${symbol}&scale=240&datalen=${datalen}`;
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': DEFAULT_UA,
-      'Referer': 'https://finance.sina.com.cn',
-      'Accept': 'application/json, text/plain, */*'
-    }
-  });
-  const txt = await res.text();
-  if (!res.ok || textLooksBlocked(txt)) throw new Error(`sina openapi blocked/status=${res.status}`);
-  const j = safeJSON(txt);
-  // 兼容多种结构，尽量提取 kline 列表
-  let kd = null;
-  if (Array.isArray(j)) {
-    kd = j;
-  } else if (j?.result?.data) {
-    const data = j.result.data;
-    const firstKey = Object.keys(data || {})[0];
-    kd = data[firstKey]?.kline || data[firstKey] || data.kline;
-  } else if (j?.data?.kline) {
-    kd = j.data.kline;
-  }
-  if (!Array.isArray(kd) || kd.length < 2) return null;
-  return kd.map(item => {
-    if (Array.isArray(item)) {
-      return { day: item[0], open: item[1], close: item[2], high: item[3], low: item[4] };
-    }
-    return { day: item?.day, open: item?.open, close: item?.close, high: item?.high, low: item?.low };
-  });
-}
-
-async function fetchPrices(symbol, datalen) {
-  const tasks = [
-    fetchFromEastmoney(symbol, datalen).then(arr => {
-      if (Array.isArray(arr) && arr.length >= 2) return arr;
-      throw new Error('eastmoney empty');
-    }),
-    fetchFromSinaOpenapi(symbol, datalen).then(arr => {
-      if (Array.isArray(arr) && arr.length >= 2) return arr;
-      throw new Error('sina openapi empty');
-    })
+async function fetchPrices(code, datalen) {
+  const sources = [
+    { name: 'eastmoney', fn: () => fetchFromEastmoney(code, datalen) },
+    { name: 'sina openapi', fn: () => fetchFromSinaOpenapi(code, datalen) }
   ];
 
-  return new Promise((resolve) => {
-    let pending = tasks.length;
-    let settled = false;
-    for (const p of tasks) {
-      p.then(result => {
-        if (!settled) {
-          settled = true;
-          resolve(result);
-        }
-      }).catch(e => {
-        console.warn(`[WARN] 数据源失败 ${symbol}: ${e.message}`);
-        pending -= 1;
-        if (pending === 0 && !settled) {
-          resolve(null);
-        }
-      });
+  for (const src of sources) {
+    try {
+      const arr = await src.fn();
+      if (Array.isArray(arr) && arr.length >= 2) {
+        return arr;
+      } else {
+        console.warn(`[WARN] 数据源返回为空 ${src.name} ${code}`);
+      }
+    } catch (e) {
+      console.warn(`[WARN] 数据源失败 ${src.name} ${code}: ${e.message}`);
     }
-  });
+  }
+
+  return null;
 }
 
 /**
@@ -300,8 +203,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       datalen = Math.max(2, diff + 1);
     }
 
-    const symbol = normalizeSymbol(code);
-    const arr = await fetchPrices(symbol, datalen);
+    const arr = await fetchPrices(code, datalen);
     if (arr) {
       dataByCode.set(code, arr);
     }

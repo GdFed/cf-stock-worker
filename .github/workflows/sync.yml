@@ -2,7 +2,7 @@ name: Sync to Notion
 on:
   workflow_dispatch:
   schedule:
-    - cron: '30 23 * * *'  # 每天 15:30 UTC
+    - cron: '20 7 * * *'  # 每天 15:30 UTC
 jobs:
   sync:
     runs-on: ubuntu-latest
