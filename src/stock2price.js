@@ -5,7 +5,19 @@ import dayjs from 'dayjs';
 
 dotenv.config();
 
-const notion = new Client({ auth: process.env.NOTION_TOKEN });
+const parseBool = (v, d = true) => {
+  if (v == null) return d;
+  const s = String(v).trim().toLowerCase();
+  return !(s === 'false' || s === '0' || s === 'no' || s === 'off');
+};
+
+const argv = process.argv.slice(2);
+const argUseNotion = argv.find(a => a.startsWith('--use-notion='));
+const USE_NOTION = argUseNotion
+  ? parseBool(argUseNotion.split('=')[1], true)
+  : parseBool(process.env.USE_NOTION, true);
+
+const notion = USE_NOTION ? new Client({ auth: process.env.NOTION_TOKEN }) : null;
 const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 const DEFAULT_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
@@ -184,9 +196,43 @@ function extractDateFromPage(page) {
 }
 
 /**
+ * 本地调试用：提供模拟的 Notion 页面数据
+ * 结构与 extractCodeFromPage/extractDateFromPage 兼容
+ */
+function getMockPages() {
+  return [
+    {
+      id: 'mock-1',
+      properties: {
+        Code: { type: 'title', title: [{ plain_text: '002095' }] },
+        Date: { type: 'date', date: { start: dayjs().subtract(30, 'day').format('YYYY-MM-DD') } }
+      }
+    },
+    {
+      id: 'mock-2',
+      properties: {
+        Code: { type: 'title', title: [{ plain_text: '600519' }] },
+        Date: { type: 'date', date: { start: dayjs().subtract(1, 'day').format('YYYY-MM-DD') } }
+      }
+    },
+    {
+      id: 'mock-3',
+      properties: {
+        Code: { type: 'title', title: [{ plain_text: '600519' }] },
+        Date: { type: 'date', date: { start: dayjs().subtract(7, 'day').format('YYYY-MM-DD') } }
+      }
+    }
+  ];
+}
+
+/**
  * 更新页面价格
  */
 async function updatePagePrices(pageId, entryClose, todayClose, maxClose, minClose) {
+  if (!USE_NOTION) {
+    console.log(`[MOCK UPDATE] page=${pageId} 入库股价=${entryClose} 当日股价=${todayClose} 最高价=${maxClose} 最低价=${minClose}`);
+    return;
+  }
   const properties = {
     '入库股价': { number: entryClose },
     '当日股价': { number: todayClose },
@@ -203,17 +249,21 @@ async function updatePagePrices(pageId, entryClose, todayClose, maxClose, minClo
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  if (!DATABASE_ID) {
-    console.error('[ERROR] 缺少环境变量 NOTION_DATABASE_ID');
-    process.exit(1);
-  }
-  if (!process.env.NOTION_TOKEN) {
-    console.error('[ERROR] 缺少环境变量 NOTION_TOKEN');
-    process.exit(1);
+  if (USE_NOTION) {
+    if (!DATABASE_ID) {
+      console.error('[ERROR] 缺少环境变量 NOTION_DATABASE_ID');
+      process.exit(1);
+    }
+    if (!process.env.NOTION_TOKEN) {
+      console.error('[ERROR] 缺少环境变量 NOTION_TOKEN');
+      process.exit(1);
+    }
+    console.log('[INFO] 拉取 Notion 数据库页面...');
+  } else {
+    console.log('[INFO] MOCK 模式：使用本地模拟的 Notion 页面数据，不会对远程 Notion 进行任何读写操作');
   }
 
-  console.log('[INFO] 拉取 Notion 数据库页面...');
-  const pages = await listAllPages(DATABASE_ID);
+  const pages = USE_NOTION ? await listAllPages(DATABASE_ID) : getMockPages();
   console.log(`[INFO] 页面总数：${pages.length}`);
 
   // 收集 code -> [{ page, date: 'YYYY-MM-DD' | null }, ...]
@@ -267,7 +317,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       console.warn(`[WARN] 无法获取价格，跳过代码 ${code}`);
       continue;
     }
-
+    // console.log(`[INFO] 正在处理price数据 ${JSON.stringify(arr)}`)
     // 构建 日期(YYYY-MM-DD) -> close 映射
     const dateToClose = new Map();
     for (const item of arr) {
@@ -278,52 +328,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       dateToClose.set(key, closeNum);
     }
 
-    // todayClose 取最后一条有效 close
-    let todayClose = NaN;
-    for (let i = arr.length - 1; i >= 0; i--) {
-      const c = parseFloat(arr[i]?.close);
-      if (!Number.isNaN(c)) {
-        todayClose = c;
-        break;
-      }
-    }
-    if (Number.isNaN(todayClose)) {
-      console.warn(`[WARN] todayClose 解析失败，跳过代码 ${code}`);
-      continue;
-    }
-
-    // fallback：第一条有效 close 作为入库价回退
-    let firstClose = NaN;
-    for (let i = 0; i < arr.length; i++) {
-      const c = parseFloat(arr[i]?.close);
-      if (!Number.isNaN(c)) {
-        firstClose = c;
-        break;
-      }
-    }
-    if (Number.isNaN(firstClose)) {
-      console.warn(`[WARN] first close 解析失败，跳过代码 ${code}`);
-      continue;
-    }
-
-    // 计算 arr 中 close 的最高/最低
-    const closes = arr
-      .map(it => parseFloat(it?.close))
-      .filter(v => Number.isFinite(v) && !Number.isNaN(v));
-    if (!closes.length) {
-      console.warn(`[WARN] 未找到有效 close，跳过代码 ${code}`);
-      continue;
-    }
-    const maxClose = Math.max(...closes);
-    const minClose = Math.min(...closes);
 
     for (const { page, date } of infos) {
       try {
-        const entryClose = (date && dateToClose.has(date)) ? dateToClose.get(date) : firstClose;
-        if (Number.isNaN(entryClose)) {
-          console.warn(`[WARN] entryClose 解析失败 page=${page.id} code=${code} date=${date}`);
-          continue;
-        }
+        const entryClose = dateToClose.get(date) || 0;
+        const todayClose = parseFloat(arr[arr.length - 1].close) || 0;
+        const limitArr = arr.filter(item => !dayjs(item.day).isBefore(dayjs(date), 'day'))
+        console.log(date , '日期下: ',JSON.stringify(limitArr))
+        const maxClose = parseFloat(limitArr.reduce((max, item) => (max > item.high ? max : item.high), 0));
+        const minClose = parseFloat(limitArr.reduce((min, item) => (min < item.low ? min : item.low), Infinity));
         await updatePagePrices(page.id, entryClose, todayClose, maxClose, minClose);
         updated++;
       } catch (e) {
