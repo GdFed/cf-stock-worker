@@ -26,8 +26,8 @@ const DATABASE_ID = process.env.NOTION_DATABASE_ID;
 
 async function fetchPrices(code, datalen) {
   const sources = [
+    { name: 'sina openapi', fn: () => fetchFromSinaOpenapi(code, datalen) },
     { name: 'eastmoney', fn: () => fetchFromEastmoney(code, datalen) },
-    { name: 'sina openapi', fn: () => fetchFromSinaOpenapi(code, datalen) }
   ];
 
   for (const src of sources) {
