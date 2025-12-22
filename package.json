@@ -21,6 +21,7 @@
     }
   },
   "devDependencies": {
-    "vite-plugin-css-injected-by-js": "^3.5.2"
+    "vite-plugin-css-injected-by-js": "^3.5.2",
+    "wrangler": "^3.0.0"
   }
 }
