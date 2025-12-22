@@ -13,6 +13,8 @@
       <div class="control-item">
         <span>K线类型:</span>
         <div class="kline-type-selector">
+            <button @click="klineType = '分时'" :class="{ active: klineType === '分时' }">分时</button>
+            <button @click="klineType = '五日'" :class="{ active: klineType === '五日' }">五日</button>
             <button @click="klineType = '日K'" :class="{ active: klineType === '日K' }">日K</button>
             <button @click="klineType = '周K'" :class="{ active: klineType === '周K' }">周K</button>
             <button @click="klineType = '月K'" :class="{ active: klineType === '月K' }">月K</button>

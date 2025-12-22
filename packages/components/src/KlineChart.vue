@@ -225,7 +225,178 @@ const maConfigs = [
   { name: "MA60", period: 60, color: "#001953" },
 ];
 
-const getOption = (rawData) => {
+// --- 分时图数据处理和配置 ---
+
+/**
+ * @description 解析分时图数据
+ * @param {object} rawData - 接口返回的原始数据中的 `data` 对象
+ * @returns {{categoryData: string[], values: number[], volumes: number[], avgPrices: number[], prePrice: number}}
+ */
+const processTimeSharingData = (rawData) => {
+  const { prePrice, trends } = rawData;
+  const categoryData = []; // 时间
+  const values = []; // 价格
+  const volumes = []; // 成交量
+  const avgPrices = []; // 均价
+
+  trends.forEach(itemStr => {
+    // 数据格式: "YYYY-MM-DD HH:mm,价格,成交量,均价"
+    const parts = itemStr.split(',');
+    const time = parts[0]; // e.g. "2025-12-22 09:30"
+    const price = parseFloat(parts[1]);
+    const volume = parseInt(parts[2]);
+    const avgPrice = parseFloat(parts[3]);
+
+    categoryData.push(time.slice(11)); // "HH:mm"
+    values.push(price);
+    volumes.push(volume);
+    avgPrices.push(avgPrice);
+  });
+
+  return { categoryData, values, volumes, avgPrices, prePrice: parseFloat(prePrice) };
+};
+
+
+/**
+ * @description 获取分时图的ECharts配置
+ * @param {object} rawData - 从接口获取的完整原始数据
+ * @returns {object} ECharts option
+ */
+const getTimeSharingOption = (rawData) => {
+    const { data } = rawData || {};
+    if (!data || !data.trends || data.trends.length === 0) {
+        return {
+            title: { text: '暂无分时数据', left: 'center', top: 'center' },
+            xAxis: { show: false }, yAxis: { show: false }, series: []
+        };
+    }
+
+    const processedData = processTimeSharingData(data);
+    const upColor = '#eb5454';
+    const downColor = '#47b262';
+
+    // 计算Y轴的动态范围
+    const getMinMax = (prePrice, prices) => {
+        const max = Math.max(prePrice, ...prices);
+        const min = Math.min(prePrice, ...prices);
+        const diff = Math.abs(max - min);
+        // 增加一点缓冲区，防止图表顶边或触底
+        return {
+            min: (min - diff * 0.1).toFixed(2),
+            max: (max + diff * 0.1).toFixed(2),
+        };
+    };
+    
+    const yAxisMinMax = getMinMax(processedData.prePrice, processedData.values);
+
+    return {
+        animation: false,
+        title: { text: `${data.name} ${data.code}`, left: 20 },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: { type: 'cross' }
+        },
+        legend: { data: ['价格', '均价'], bottom: 10, left: 'center' },
+        grid: [
+            { top: '8%', left: '10%', right: '8%', height: '60%' }, // 主图
+            { left: '10%', right: '8%', top: '73%', height: '20%' }, // 成交量
+        ],
+        xAxis: [
+            {
+                type: 'category',
+                data: processedData.categoryData,
+                boundaryGap: false,
+                axisLine: { onZero: false },
+                splitLine: { show: false },
+                min: 'dataMin',
+                max: 'dataMax',
+            },
+            {
+                type: 'category',
+                gridIndex: 1,
+                data: processedData.categoryData,
+                boundaryGap: false,
+                axisLine: { onZero: false },
+                axisTick: { show: false },
+                splitLine: { show: false },
+                axisLabel: { show: false },
+                min: 'dataMin',
+                max: 'dataMax',
+            }
+        ],
+        yAxis: [
+            {
+                scale: true,
+                splitArea: { show: true },
+                min: yAxisMinMax.min,
+                max: yAxisMinMax.max,
+                axisLabel: {
+                    formatter: (value) => {
+                        const rate = ((value - processedData.prePrice) / processedData.prePrice * 100);
+                        const rateString = rate.toFixed(2) + '%';
+                        return `${value.toFixed(2)}\n${rateString}`;
+                    }
+                }
+            },
+            {
+                scale: true,
+                gridIndex: 1,
+                splitNumber: 2,
+                axisLabel: { show: false },
+                axisLine: { show: false },
+                axisTick: { show: false },
+                splitLine: { show: false },
+            },
+        ],
+        dataZoom: [
+            { type: 'inside', xAxisIndex: [0, 1], start: 0, end: 100 },
+        ],
+        series: [
+            {
+                name: '价格',
+                type: 'line',
+                data: processedData.values,
+                smooth: true,
+                showSymbol: false,
+                lineStyle: { color: '#2b7cff', width: 1.5 },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
+                        offset: 0,
+                        color: 'rgba(43, 124, 255, 0.3)'
+                    }, {
+                        offset: 1,
+                        color: 'rgba(43, 124, 255, 0)'
+                    }])
+                }
+            },
+            {
+                name: '均价',
+                type: 'line',
+                data: processedData.avgPrices,
+                smooth: true,
+                showSymbol: false,
+                lineStyle: { color: '#f6b92b', width: 1.2 }
+            },
+            {
+                name: '成交量',
+                type: 'bar',
+                xAxisIndex: 1,
+                yAxisIndex: 1,
+                data: processedData.volumes,
+                itemStyle: {
+                    color: ({ dataIndex }) => {
+                        const currentPrice = processedData.values[dataIndex];
+                        // 第一根柱子与昨收比较
+                        const prevPrice = dataIndex > 0 ? processedData.values[dataIndex - 1] : processedData.prePrice;
+                        return currentPrice >= prevPrice ? upColor : downColor;
+                    }
+                }
+            }
+        ]
+    };
+};
+
+const getKLineOption = (rawData) => {
     const { data } = rawData || {};
     if (!data || !data.klines || data.klines.length === 0) {
       // 当没有数据时，返回一个空的配置对象，避免渲染错误
@@ -385,15 +556,25 @@ const getOption = (rawData) => {
     };
 };
 
+// 根据 klineType 路由到不同的 option 生成函数
+const getOption = (rawData) => {
+  if (props.klineType === '分时' || props.klineType === '五日') {
+    return getTimeSharingOption(rawData);
+  }
+  return getKLineOption(rawData);
+};
+
 const renderChart = async () => {
   if (!myChart) {
     myChart = echarts.init(chart.value);
   }
+
   myChart.showLoading();
   try {
     const klineData = await getKlineData(props.codeId, props.klineType);
     const option = getOption(klineData);
-    myChart.setOption(option);
+    // 第二个参数 `true` 表示不与之前的 option 进行合并，这对于切换完全不同的图表类型至关重要
+    myChart.setOption(option, true);
   } catch (error) {
     console.error('Failed to render chart:', error);
   } finally {

@@ -5,7 +5,7 @@
   "description": "Sync intersection of buy/strong picks to Notion database",
   "scripts": {
     "dev": "pnpm --filter=chrome dev",
-    "build": "pnpm --filter=chrome build",
+    "build": "pnpm build:comp && pnpm --filter=chrome build",
     "dev:comp": "pnpm --filter=components dev",
     "build:comp": "pnpm --filter=components build",
     "s2n": "pnpm --filter=worker s2n",
