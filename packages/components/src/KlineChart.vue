@@ -250,6 +250,10 @@ const getOption = (rawData) => {
 
     return {
         animation: false,
+        title: {
+            text: `${data.name} ${data.code}`,
+            left: 20,
+        },
         legend: {
             bottom: 10,
             left: 'center',
