@@ -8,7 +8,7 @@ export async function getGitHubFile(rawUrl) {
         snippet = ` - ${body.slice(0, 200)}`;
       }
     } catch {
-      // ignore body read errors for error reporting
+      // 忽略响应体读取错误，以便报告错误
     }
     throw new Error(`Failed to fetch ${rawUrl}: ${r.status} ${r.statusText}${snippet}`);
   }

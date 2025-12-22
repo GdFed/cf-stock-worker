@@ -1,12 +1,12 @@
-// Intersection utility (ESM)
-// Unified newline handling and shared logic between Worker and Node CLI.
+// 交集工具 (ESM)
+// 在 Worker 和 Node CLI 之间统一处理换行符和共享逻辑。
 
 /**
- * Compute intersection of buy codes (filtered by target dates) and strong codes.
- * @param {string} buyText - Lines like "CODE:date1,date2,..."
- * @param {string} strongText - Lines like "CODE,..." (take first segment as code)
- * @param {Set<string>} targetDates - Set of dates to filter buy codes by (e.g., new Set([today, yesterday]))
- * @returns {string[]} Sorted list of codes in the intersection.
+ * 计算买入代码（按目标日期过滤）和强势代码的交集。
+ * @param {string} buyText - 格式为 "代码:日期1,日期2,..." 的行
+ * @param {string} strongText - 格式为 "代码,..." 的行 (取第一部分作为代码)
+ * @param {Set<string>} targetDates - 用于过滤买入代码的日期集合 (例如, new Set([今天, 昨天]))
+ * @returns {string[]} 交集中已排序的代码列表。
  */
 export function intersectionByDateSet(buyText, strongText, targetDates) {
   const strongSet = new Set(
@@ -30,7 +30,7 @@ export function intersectionByDateSet(buyText, strongText, targetDates) {
 }
 
 /**
- * Convenience wrapper using two dates.
+ * 使用两个日期的便捷包装器。
  * @param {string} buyText
  * @param {string} strongText
  * @param {string[]} days

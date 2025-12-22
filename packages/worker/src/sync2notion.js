@@ -6,8 +6,8 @@ import { fmt, lastTradeDay, isTradeDay } from './utils/trading-day.js';
 
 dotenv.config();
 
-const NOTION_TIMEOUT_MS = Number(process.env.NOTION_TIMEOUT_MS || 180000); // 180s
-const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 15000);    // 15s
+const NOTION_TIMEOUT_MS = Number(process.env.NOTION_TIMEOUT_MS || 180000); // 180秒
+const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 15000);    // 15秒
 
 const notion = new Client({
   auth: process.env.NOTION_TOKEN,

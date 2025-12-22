@@ -1,8 +1,8 @@
-// Trading day utilities (ESM)
-// Extracted shared logic: holiday calendar, fmt, isTradeDay, lastTradeDay.
+// 交易日工具 (ESM)
+// 提取的共享逻辑：假日日历、fmt、isTradeDay、lastTradeDay。
 
 /**
- * Holiday calendar for 2026 (YYYY-MM-DD).
+ * 2026 年假日日历 (YYYY-MM-DD)。
  */
 export const holiday = new Set([
   '2026-01-01','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',
@@ -12,14 +12,14 @@ export const holiday = new Set([
 ]);
 
 /**
- * Format Date to YYYY-MM-DD.
+ * 将日期格式化为 YYYY-MM-DD。
  * @param {Date} d
  * @returns {string}
  */
 export const fmt = d => d.toISOString().slice(0, 10);
 
 /**
- * Check if given date is a trading day (Mon-Fri and not in holiday set).
+ * 检查给定日期是否为交易日（周一至周五且不在假日列表中）。
  * @param {Date} d
  * @returns {boolean}
  */
@@ -29,16 +29,16 @@ export const isTradeDay = d => {
 };
 
 /**
- * Walk dates by given step until hitting a trading day.
- * Note: step=0 returns immediately if current date is trade day; if not, it will loop forever.
- * @param {Date|string} d - Date or date string compatible with new Date()
- * @param {number} step - day step, default -1
+ * 按给定步长遍历日期，直到找到一个交易日。
+ * 注意：如果当前日期是交易日，step=0 会立即返回；如果不是，则会无限循环。
+ * @param {Date|string} d - 日期或与 new Date() 兼容的日期字符串
+ * @param {number} step - 日期步长，默认为 -1
  * @returns {Date}
  */
 export const lastTradeDay = (d, step = -1) => {
   const t = new Date(d);
-  // Preserve original semantics from callers; no guard for step=0 here.
-  // Caller uses step=0 expecting "today if trade day".
+  // 保留调用者的原始语义；此处不对 step=0 进行保护。
+  // 调用者使用 step=0 期望“如果是交易日则返回今天”。
   while (true) {
     t.setDate(t.getDate() + step);
     if (isTradeDay(t)) return t;

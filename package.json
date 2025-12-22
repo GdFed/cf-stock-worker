@@ -1,20 +1,26 @@
 {
-  "name": "cf-stock-worker",
+  "name": "cf-stock-worker-monorepo",
   "version": "1.0.0",
   "private": true,
   "description": "Sync intersection of buy/strong picks to Notion database",
-  "type": "module",
-  "main": "src/index.js",
   "scripts": {
-    "s2n": "node src/sync2notion.js",
-    "s2p": "node src/stock2price.js"
+    "dev": "pnpm --filter=chrome dev",
+    "build": "pnpm --filter=chrome build",
+    "dev:comp": "pnpm --filter=components dev",
+    "build:comp": "pnpm --filter=components build",
+    "s2n": "pnpm --filter=worker s2n",
+    "s2p": "pnpm --filter=worker s2p"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "dependencies": {
-    "@notionhq/client": "^2.2.15",
-    "dayjs": "^1.11.13",
-    "dotenv": "^16.4.5"
+  "packageManager": "pnpm@9.6.0",
+  "pnpm": {
+    "overrides": {
+      "undici": "^6.0.0"
+    }
+  },
+  "devDependencies": {
+    "vite-plugin-css-injected-by-js": "^3.5.2"
   }
 }
