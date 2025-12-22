@@ -1,5 +1,5 @@
 import { createApp } from 'vue';
-import StockDetail from './StockDetail.vue';
+import TrainingExample from './TrainingExample.vue';
 
-const app = createApp(StockDetail);
+const app = createApp(TrainingExample);
 app.mount('#app');

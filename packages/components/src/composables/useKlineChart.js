@@ -326,13 +326,30 @@ export function useKlineChart(props) {
     const renderChart = async () => {
         if (!myChart) {
             myChart = echarts.init(chart.value);
+            // 解决图表初始动画导致的渲染问题
+            myChart.setOption({ animation: false });
         }
 
         myChart.showLoading();
         try {
-            const klineData = await getKlineData(props.codeId, props.klineType);
+            let klineData;
+            // 如果是训练模式且有数据，则使用传入的数据
+            if (props.isTraining && props.chartData) {
+                klineData = props.chartData;
+            } else if (props.codeId) { // 否则，如果不是训练模式，则通过接口获取
+                klineData = await getKlineData(props.codeId, props.klineType);
+            } else {
+                // 如果是训练模式但初始没有数据，或者没有codeId，显示一个空状态
+                myChart.setOption({
+                    title: { text: '等待数据...', left: 'center', top: 'center' },
+                    xAxis: { show: false }, yAxis: { show: false }, series: []
+                }, true);
+                myChart.hideLoading();
+                return;
+            }
+
             const option = getOption(klineData);
-            // 第二个参数 `true` 表示不与之前的 option 进行合并，这对于切换完全不同的图表类型至关重要
+            // true 表示不与之前的 option 进行合并
             myChart.setOption(option, true);
         } catch (error) {
             console.error('Failed to render chart:', error);
@@ -345,9 +362,9 @@ export function useKlineChart(props) {
         renderChart();
     });
 
-    watch(() => [props.codeId, props.klineType], () => {
+    watch(() => [props.codeId, props.klineType, props.chartData], () => {
         renderChart();
-    });
+    }, { deep: true }); // 使用 deep watch 来侦听 chartData 内部的变化
 
   return {
     chart
