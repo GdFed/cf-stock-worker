@@ -6,11 +6,20 @@
       <button @click="$emit('showAll')">显示全部</button>
       <button @click="$emit('reset')">重置</button>
     </div>
+    <TimeSharingModal
+      v-if="showModal"
+      :visible="showModal"
+      :code-id="props.codeId"
+      :date="selectedDate"
+      @close="closeModal"
+    />
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue';
 import { useKlineChart } from './composables/useKlineChart';
+import TimeSharingModal from './TimeSharingModal.vue';
 
 const props = defineProps({
   codeId: {
@@ -33,7 +42,22 @@ const props = defineProps({
 
 defineEmits(['next', 'showAll', 'reset']);
 
-const { chart } = useKlineChart(props);
+const showModal = ref(false);
+const selectedDate = ref('');
+
+const handleOpenTimeSharing = (date) => {
+  console.log('handleOpenTimeSharing received date:', date);
+  if (props.codeId) {
+    selectedDate.value = date;
+    showModal.value = true;
+  }
+};
+
+const closeModal = () => {
+  showModal.value = false;
+};
+
+const { chart } = useKlineChart(props, { onContextMenu: handleOpenTimeSharing });
 </script>
 
 <style scoped>

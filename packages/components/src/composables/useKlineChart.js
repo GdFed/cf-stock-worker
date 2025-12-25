@@ -3,11 +3,13 @@ import * as echarts from 'echarts';
 import { getKlineData } from '../api/kline';
 import { calculateKDJ, calculateMACD, calculateMA } from './kline-data/indicators';
 import { processRawData } from './kline-data/kline';
-import { processTimeSharingData } from './kline-data/time-sharing';
+import { getTimeSharingOption } from './kline-data/options';
 
-export function useKlineChart(props) {
+export function useKlineChart(props, { onContextMenu } = {}) {
   const chart = ref(null);
   let myChart = null;
+  let processedData = null; // 提升作用域，用于事件回调
+  let selectedIndex = null; // 当前选中的K线索引，用于右键打开分时
 
   const maConfigs = [
     { name: "MA5", period: 5, color: "#faa90e" },
@@ -15,145 +17,6 @@ export function useKlineChart(props) {
     { name: "MA20", period: 20, color: "#416df9" },
     { name: "MA60", period: 60, color: "#001953" },
   ];
-
-  /**
-   * @description 获取分时图的ECharts配置
-   * @param {object} rawData - 从接口获取的完整原始数据
-   * @returns {object} ECharts option
-   */
-    const getTimeSharingOption = (rawData) => {
-        const { data } = rawData || {};
-        if (!data || !data.trends || data.trends.length === 0) {
-            return {
-                title: { text: '暂无分时数据', left: 'center', top: 'center' },
-                xAxis: { show: false }, yAxis: { show: false }, series: []
-            };
-        }
-
-        const processedData = processTimeSharingData(data);
-        const upColor = '#eb5454';
-        const downColor = '#47b262';
-
-        // 计算Y轴的动态范围
-        const getMinMax = (prePrice, prices) => {
-            const max = Math.max(prePrice, ...prices);
-            const min = Math.min(prePrice, ...prices);
-            const diff = Math.abs(max - min);
-            // 增加一点缓冲区，防止图表顶边或触底
-            return {
-                min: (min - diff * 0.1).toFixed(2),
-                max: (max + diff * 0.1).toFixed(2),
-            };
-        };
-        
-        const yAxisMinMax = getMinMax(processedData.prePrice, processedData.values);
-
-        return {
-            animation: false,
-            title: { text: `${data.name} ${data.code}`, left: 20 },
-            tooltip: {
-                trigger: 'axis',
-                axisPointer: { type: 'cross' }
-            },
-            legend: { data: ['价格', '均价'], bottom: 10, left: 'center' },
-            grid: [
-                { top: '8%', left: '10%', right: '8%', height: '60%' }, // 主图
-                { left: '10%', right: '8%', top: '73%', height: '20%' }, // 成交量
-            ],
-            xAxis: [
-                {
-                    type: 'category',
-                    data: processedData.categoryData,
-                    boundaryGap: false,
-                    axisLine: { onZero: false },
-                    splitLine: { show: false },
-                    min: 'dataMin',
-                    max: 'dataMax',
-                },
-                {
-                    type: 'category',
-                    gridIndex: 1,
-                    data: processedData.categoryData,
-                    boundaryGap: false,
-                    axisLine: { onZero: false },
-                    axisTick: { show: false },
-                    splitLine: { show: false },
-                    axisLabel: { show: false },
-                    min: 'dataMin',
-                    max: 'dataMax',
-                }
-            ],
-            yAxis: [
-                {
-                    scale: true,
-                    splitArea: { show: true },
-                    min: yAxisMinMax.min,
-                    max: yAxisMinMax.max,
-                    axisLabel: {
-                        formatter: (value) => {
-                            const rate = ((value - processedData.prePrice) / processedData.prePrice * 100);
-                            const rateString = rate.toFixed(2) + '%';
-                            return `${value.toFixed(2)}\n${rateString}`;
-                        }
-                    }
-                },
-                {
-                    scale: true,
-                    gridIndex: 1,
-                    splitNumber: 2,
-                    axisLabel: { show: false },
-                    axisLine: { show: false },
-                    axisTick: { show: false },
-                    splitLine: { show: false },
-                },
-            ],
-            dataZoom: [
-                { type: 'inside', xAxisIndex: [0, 1], start: 0, end: 100 },
-            ],
-            series: [
-                {
-                    name: '价格',
-                    type: 'line',
-                    data: processedData.values,
-                    smooth: true,
-                    showSymbol: false,
-                    lineStyle: { color: '#2b7cff', width: 1.5 },
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{
-                            offset: 0,
-                            color: 'rgba(43, 124, 255, 0.3)'
-                        }, {
-                            offset: 1,
-                            color: 'rgba(43, 124, 255, 0)'
-                        }])
-                    }
-                },
-                {
-                    name: '均价',
-                    type: 'line',
-                    data: processedData.avgPrices,
-                    smooth: true,
-                    showSymbol: false,
-                    lineStyle: { color: '#f6b92b', width: 1.2 }
-                },
-                {
-                    name: '成交量',
-                    type: 'bar',
-                    xAxisIndex: 1,
-                    yAxisIndex: 1,
-                    data: processedData.volumes,
-                    itemStyle: {
-                        color: ({ dataIndex }) => {
-                            const currentPrice = processedData.values[dataIndex];
-                            // 第一根柱子与昨收比较
-                            const prevPrice = dataIndex > 0 ? processedData.values[dataIndex - 1] : processedData.prePrice;
-                            return currentPrice >= prevPrice ? upColor : downColor;
-                        }
-                    }
-                }
-            ]
-        };
-    };
 
     const getKLineOption = (rawData) => {
         const { data } = rawData || {};
@@ -171,7 +34,7 @@ export function useKlineChart(props) {
         };
         }
 
-        const processedData = processRawData(data.klines);
+        processedData = processRawData(data.klines);
         const macdData = calculateMACD(processedData);
         const kdjData = calculateKDJ(processedData);
 
@@ -228,6 +91,7 @@ export function useKlineChart(props) {
             series: [
                 // 主图 Candlestick
                 {
+                    id: 'main-candle',
                     name: data.name,
                     type: 'candlestick',
                     data: processedData.values,
@@ -323,11 +187,89 @@ export function useKlineChart(props) {
         return getKLineOption(rawData);
     };
 
+    const updateSelectionMark = () => {
+        if (!myChart) return;
+
+        const hasData = processedData && Array.isArray(processedData.categoryData) && processedData.categoryData.length > 0;
+        const inRange = hasData && selectedIndex != null && selectedIndex >= 0 && selectedIndex < processedData.categoryData.length;
+
+        if (!hasData || !inRange) {
+            // 清除标记，并显式绑定到主蜡烛系列 id，避免 series 索引错位
+            myChart.setOption({
+                series: [{
+                    id: 'main-candle',
+                    markLine: {
+                        symbol: 'none',
+                        label: { show: false },
+                        lineStyle: { color: '#888', type: 'dashed' },
+                        data: []
+                    }
+                }]
+            });
+            return;
+        }
+
+        const date = processedData.categoryData[selectedIndex];
+        myChart.setOption({
+            series: [{
+                id: 'main-candle',
+                markLine: {
+                    symbol: 'none',
+                    label: { show: false },
+                    lineStyle: { color: '#888', type: 'dashed' },
+                    data: [{ xAxis: date }]
+                }
+            }]
+        });
+    };
+
+    const bindInteractions = () => {
+        const zr = myChart.getZr();
+
+        // 左键点击：设置选中索引
+        myChart.on('click', { seriesId: 'main-candle' }, (params) => {
+            if (props.klineType === '分时' || props.klineType === '五日') return;
+            if (!processedData || !processedData.categoryData || processedData.categoryData.length === 0) return;
+
+            selectedIndex = params.dataIndex;
+            updateSelectionMark();
+            const date = processedData.categoryData[selectedIndex];
+            console.log('K-line selected index:', selectedIndex, 'date:', date);
+        });
+
+        // 右键：打开分时弹窗
+        zr.on('contextmenu', (event) => {
+            if (props.klineType === '分时' || props.klineType === '五日') return;
+            if (event && event.event && typeof event.event.preventDefault === 'function') {
+                event.event.preventDefault();
+            }
+
+            if (!processedData || !processedData.categoryData || processedData.categoryData.length === 0) return;
+
+            let idx = selectedIndex;
+            if (idx == null) {
+                const pointInPixel = [event.offsetX, event.offsetY];
+                if (!myChart.containPixel({ gridIndex: 0 }, pointInPixel)) return;
+                const xCoordArr = myChart.convertFromPixel({ gridIndex: 0 }, pointInPixel);
+                const xCoord = Array.isArray(xCoordArr) ? xCoordArr[0] : xCoordArr;
+                if (!Number.isFinite(xCoord)) return;
+                idx = Math.max(0, Math.min(processedData.categoryData.length - 1, Math.round(xCoord)));
+            }
+
+            const date = processedData.categoryData[idx];
+            console.log('K-line contextmenu on date:', date, 'index:', idx);
+            if (typeof onContextMenu === 'function') {
+                onContextMenu(date);
+            }
+        });
+    };
+
     const renderChart = async () => {
         if (!myChart) {
             myChart = echarts.init(chart.value);
             // 解决图表初始动画导致的渲染问题
             myChart.setOption({ animation: false });
+            bindInteractions();
         }
 
         myChart.showLoading();
@@ -351,6 +293,7 @@ export function useKlineChart(props) {
             const option = getOption(klineData);
             // true 表示不与之前的 option 进行合并
             myChart.setOption(option, true);
+            updateSelectionMark();
         } catch (error) {
             console.error('Failed to render chart:', error);
         } finally {

@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
     plugins: [vue(), cssInjectedByJs()],
     define: {
       // For production build, prepend the target. For dev, it's an empty string and the proxy is used.
-      'process.env.VITE_API_TARGET': JSON.stringify(mode === 'production' ? proxyTarget : '')
+      'import.meta.env.VITE_API_TARGET': JSON.stringify(mode === 'production' ? proxyTarget : '')
     },
     server: {
       proxy: {

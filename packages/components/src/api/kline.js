@@ -1,4 +1,4 @@
-export const getKlineData = async (codeId, klineType) => {
+export const getKlineData = async (codeId, klineType, date) => {
   const zt = {
     '分时': '1', '五日': '5', '日K': '101', '周K': '102', '月K': '103', '季K': '104', '年K': '106',
     '120分': '120', '60分': '60', '30分': '30', '15分': '15', '5分': '5'
@@ -6,8 +6,20 @@ export const getKlineData = async (codeId, klineType) => {
 
   let path, params;
 
-  if (klineType === '分时' || klineType === '五日') {
-    path = '/api/qt/stock/trends2/get';
+  // 当请求历史某天的分时数据时
+  if (klineType === '分时' && date) {
+    path = '/api/qt/stock/trends/get'; // 注意，历史分时接口不同
+    params = {
+      secid: codeId,
+      fields1: 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13',
+      fields2: 'f51,f52,f53,f54,f55,f56,f57,f58',
+      iscr: 0,
+      iscca: 0,
+      ut: 'fa5fd1943c7b386f172d6893dbfba10b',
+      date: date.replace(/-/g, ''), // 格式如 20231225
+    }
+  } else if (klineType === '分时' || klineType === '五日') {
+    path = '/api/qt/stock/trends2/get'; // 当日和5日分时接口
     params = {
       secid: codeId,
       fields1: 'f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14',
